@@ -63,15 +63,12 @@ dataset:
 
 # Model Architecture
 model:
-  name: "GaitSet"  # Model architecture
-
   # Backbone configuration
   backbone:
-    type: "GaitSet"
     in_channels: 1  # Silhouette channels
     hidden_dim: 256
 
-    # SetPooling configuration (key component of GaitSet)
+    # SetPooling configuration
     set_pooling:
       type: "statistics"  # Max + Mean pooling
       bins: [16, 8, 4, 2, 1]  # Multi-scale temporal pooling
