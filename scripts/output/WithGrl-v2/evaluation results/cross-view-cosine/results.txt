@@ -1,0 +1,6 @@
+Gait Recognition Evaluation Results
+==================================================
+Rank-1:  51.92%
+Rank-5:  65.38%
+Rank-10: 73.08%
+mAP:     52.20%

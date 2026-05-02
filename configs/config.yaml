@@ -1,0 +1,186 @@
+# ==================================================================
+# Configuration for Gait Biometric Identification System
+# With Gradient Reversal Layer (GRL)
+# ==================================================================
+
+# Experiment Information
+experiment:
+  name: "gait_biometric_identification"
+  description_label: "WithGrl"
+  version: "2"
+  seed: 42
+  output_dir: "/gait_biometric_identification/scripts/output"   # Final output dir will be "{output_dir}/{description}-v{version}"
+  save_checkpoint_freq: 1  # Save checkpoint every N epochs
+
+# Device Configuration
+device:
+  type: "cuda"  # Options: "cuda", "mps", "cpu"
+  gpu_ids: [0]  # List of GPU IDs to use
+  num_workers: 12  # Number of data loading workers
+  pin_memory: false
+  persistent_workers: true
+
+# Dataset Configuration
+dataset:
+  name: "CASIA-B"
+  data_root: "../Datasets/CASIA-B/casiab-128-end2end"
+  cache_enabled: false  # Cache data in memory for faster training
+
+  # Data splits - following standard CASIA-B protocol
+  train:
+    subjects: [1, 98]  # Subject IDs 001-074 for training
+    conditions: ["nm-01", "nm-02", "nm-03", "nm-04", "nm-05", "nm-06"]
+
+  # Gallery-Probe split for evaluation
+  gallery:
+    subjects: [99, 124]  # Subject IDs 075-124 for testing
+    conditions: ["nm-01", "nm-02", "nm-03", "nm-04"]  # Normal walking as gallery
+    views: [0, 18, 36, 54, 72, 90]  # All view angles
+
+  probe:
+    subjects: [99, 124]
+    # Different probe conditions for evaluation
+    nm: ["nm-05", "nm-06"]  # Normal walking
+    bg: []  # With bag
+    cl: []  # Different clothing
+    views: [108, 126, 144, 162, 180]
+
+  # Data preprocessing
+  input:
+    resolution: [128, 128]  # Height x Width for silhouettes
+    frame_num: 50  # Number of frames per sequence
+    sample_type: "fixed"  # Options: "fixed", "unfixed", "all"
+    truncate_threshold: 20  # Minimum frames required
+
+  # Data augmentation
+  augmentation:
+    enabled: false
+    horizontal_flip: true
+    flip_prob: 0.5
+    random_rotation: 10  # degrees
+    random_erasing: true
+    erasing_prob: 0.5
+
+# Model Architecture
+model:
+  name: "GaitSet"  # Model architecture
+
+  # Backbone configuration
+  backbone:
+    type: "GaitSet"
+    in_channels: 1  # Silhouette channels
+    hidden_dim: 256
+
+    # SetPooling configuration (key component of GaitSet)
+    set_pooling:
+      type: "statistics"  # Max + Mean pooling
+      bins: [16, 8, 4, 2, 1]  # Multi-scale temporal pooling
+
+    # Feature dimensions
+    feature_channels: 256
+    embedding_dim: 128
+
+  # Gradient Reversal Layer (GRL) Configuration
+  grl:
+    enabled: true  # Toggle GRL on/off
+    lambda_grl: 1.0  # GRL strength parameter
+    schedule: "progressive"  # Options: "constant", "progressive", "adaptive"
+
+    # Progressive schedule (if schedule="progressive")
+    progressive:
+      num_of_warmup_epochs: 20  # Start adversarial training after 20 epochs
+
+    # Domain discriminator for view angle classification
+    discriminator:
+      hidden_dims: [256, 128, 64]
+      num_views: 11  # Number of view angles in CASIA-B
+      dropout: 0.3
+
+# Loss Functions
+loss:
+  # Identity classification loss
+  identity_loss:
+    type: "CrossEntropyLoss"
+    weight: 1.0
+    label_smoothing: 0.1
+
+  # Triplet loss for metric learning
+  triplet_loss:
+    enabled: true
+    weight: 1.0
+    margin: 0.4
+    type: "batch_hard"  # Options: "batch_all", "batch_hard"
+
+  # View classification loss (for GRL)
+  view_loss:
+    type: "CrossEntropyLoss"
+    weight: 0.5
+
+  # Center loss for intra-class compactness
+  center_loss:
+    enabled: true
+    weight: 0.0005
+    num_classes: 98  # Number of training subjects
+    feature_dim: 256
+
+# Training Configuration
+training:
+  person_num: 4  # Number of persons per batch
+  sample_num: 12  # Number of samples per person
+  batch_size: 48  # [batch_size = person_num * sample_num]
+  num_epochs: 200
+  resume: null  # Path to checkpoint to resume from
+
+  # Optimizer
+  optimizer:
+    type: "AdamW"
+    lr: 0.0001
+    weight_decay: 0.0005
+    betas: [0.9, 0.999]
+    amsgrad: true
+
+  # Learning rate scheduler
+  scheduler:
+    type: "MultiStepLR"
+    milestones: [120, 170]
+    gamma: 0.1
+
+  # Gradient clipping
+  grad_clip:
+    enabled: true
+    max_norm: 5.0
+
+# Evaluation Configuration
+evaluation:
+  # Evaluation protocol
+  batch_size: 1
+  metric: "euclidean"  # Options: "euclidean", "cosine"
+  
+  # Re-ranking
+  rerank:
+    enabled: false
+    k1: 20
+    k2: 6
+    lambda_value: 0.3
+  
+  # Metrics to compute
+  metrics:
+    - "rank1"  # Rank-1 accuracy
+    - "rank5"  # Rank-5 accuracy
+    - "rank10"  # Rank-10 accuracy
+    - "mAP"  # Mean Average Precision
+  
+  # Save evaluation results
+  save_results: true
+  save_features: true  # Save extracted features
+  visualization:
+    enabled: true
+    tsne: true  # t-SNE visualization
+    confusion_matrix: true
+
+# Logging Configuration
+logging:
+  use_tensorboard: true
+  print_freq: 1  # Print training info every N iterations
+  save_results: true
+
