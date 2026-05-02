@@ -1,6 +1,6 @@
 # Gait Biometric Identification System
 
-A state-of-the-art gait recognition system with Gradient Reversal Layer (GRL) for view-invariant learning.
+**University Undergraduate Thesis**: A state-of-the-art gait recognition system with Gradient Reversal Layer (GRL) for view-invariant learning.
 
 ## Features
 
